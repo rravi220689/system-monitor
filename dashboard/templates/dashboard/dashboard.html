@@ -1,0 +1,827 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}SysMonitor Ultra - Live Telemetry &amp; RAM Optimizer{% endblock %}
+
+{% block content %}
+<!-- Top Network & Server Banner -->
+<div class="glass-card rounded-2xl p-4 mb-6 border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/30">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <!-- Host & Network IP info -->
+        <div class="flex items-center space-x-3.5">
+            <div class="w-11 h-11 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 text-lg shadow-lg shadow-cyan-950/60 flex-shrink-0">
+                <i class="fa-solid fa-server"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2.5 flex-wrap">
+                    <span class="text-base font-black text-white tracking-tight" id="sysHostname">{{ metrics.system.hostname }}</span>
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900 text-slate-300 border border-slate-700/80" id="sysOs">
+                        {{ metrics.system.os }}
+                    </span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center space-x-1.5" id="healthBadge">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-beacon"></span>
+                        <span id="healthText">HEALTH: {{ metrics.health.score }}/100 ({{ metrics.health.status_level }})</span>
+                    </span>
+                </div>
+                <div class="flex items-center space-x-3 text-[11px] text-slate-400 mt-1 font-mono flex-wrap">
+                    <span><i class="fa-solid fa-clock-rotate-left mr-1 text-cyan-400"></i> Uptime: <strong class="text-slate-200" id="sysUptime">{{ metrics.system.uptime }}</strong></span>
+                    <span><i class="fa-solid fa-power-off mr-1 text-slate-500"></i> Booted: <span id="sysBoot">{{ metrics.system.boot_time }}</span></span>
+                    <span><i class="fa-brands fa-python mr-1 text-amber-400"></i> Python {{ metrics.system.python_version }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Access Pill & Polling Control -->
+        <div class="flex flex-wrap items-center gap-3">
+            <!-- Outside Network Access URL -->
+            <div class="flex items-center space-x-2 bg-slate-950/90 rounded-xl px-3 py-1.5 border border-cyan-500/30 text-xs">
+                <i class="fa-solid fa-wifi text-emerald-400 text-xs"></i>
+                <span class="text-slate-400 text-[11px]">LAN Access:</span>
+                <code class="text-cyan-300 font-mono font-bold text-xs" id="networkUrl">http://160.191.14.183:8000</code>
+                <button onclick="copyNetworkUrl()" title="Copy LAN URL" class="text-slate-400 hover:text-cyan-300 transition ml-1 p-1">
+                    <i class="fa-regular fa-copy text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Polling Rate -->
+            <div class="flex items-center space-x-2 bg-slate-950/90 rounded-xl px-3 py-1.5 border border-slate-800 text-xs">
+                <span class="text-slate-400 text-[11px]">Poll:</span>
+                <select id="pollIntervalSelect" onchange="changePollInterval(this.value)" class="bg-slate-900 text-cyan-300 font-mono text-xs rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-cyan-500">
+                    <option value="1000">1s Live</option>
+                    <option value="2000" selected>2s Default</option>
+                    <option value="5000">5s Low CPU</option>
+                    <option value="0">Paused</option>
+                </select>
+                <button onclick="fetchMetrics()" title="Refresh Now" class="text-slate-400 hover:text-white transition p-1">
+                    <i class="fa-solid fa-arrows-rotate text-xs" id="refreshIcon"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- HERO COMMAND CONSOLE: RAM OPTIMIZER & PRESSURE REDUCTION -->
+<div class="relative overflow-hidden rounded-3xl p-6 sm:p-7 mb-6 glass-card border border-emerald-500/30 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/20 shadow-2xl">
+    <div class="absolute -right-10 -top-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -left-10 -bottom-10 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
+        <div class="space-y-2 text-center lg:text-left flex-1">
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
+                <i class="fa-solid fa-microchip text-emerald-400"></i>
+                <span>Kernel Working Set Trimmer &amp; Decompressor</span>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Optimize RAM &amp; Reduce System Pressure
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                Executes native Windows <code class="text-cyan-300 font-mono text-xs">EmptyWorkingSet</code> system calls across all running processes, flushes stale file cache buffers back to the OS pool, and triggers Python runtime garbage collection.
+            </p>
+            
+            <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2 text-xs font-mono">
+                <div class="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <span class="text-slate-400">Memory Pressure:</span>
+                    <strong class="text-emerald-400 font-bold ml-1.5 text-sm" id="heroRamPct">{{ metrics.memory.percent }}%</strong>
+                </div>
+                <div class="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <span class="text-slate-400">Available Headroom:</span>
+                    <strong class="text-cyan-300 font-bold ml-1.5 text-sm" id="heroRamAvail">{{ metrics.memory.available_gb }} GB</strong>
+                </div>
+                <div class="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <span class="text-slate-400">Active Task Threads:</span>
+                    <strong class="text-slate-200 font-bold ml-1.5 text-sm" id="heroProcCount">{{ metrics.processes_count }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-shrink-0 w-full lg:w-auto">
+            <button id="heroOptimizeBtn" onclick="triggerRamOptimization()"
+                class="w-full lg:w-auto px-8 py-5 rounded-2xl glow-btn-emerald text-slate-950 font-black text-sm tracking-wide transition-all duration-200 flex items-center justify-center space-x-3 cursor-pointer group">
+                <i class="fa-solid fa-bolt text-slate-950 text-xl group-hover:scale-125 transition-transform duration-200"></i>
+                <span class="text-base uppercase tracking-wider">PURGE RAM &amp; DECOMPRESS SYSTEM</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- FOUR GLOWING CIRCULAR MASTER GAUGES -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- CPU Master Gauge Card -->
+    <div class="glass-card rounded-3xl p-5 border border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                <i class="fa-solid fa-microchip text-cyan-400"></i>
+                <span>CPU Processor</span>
+            </span>
+            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800" id="cpuCoresBadge">
+                {{ metrics.cpu.logical_cores }}T / {{ metrics.cpu.physical_cores }}C
+            </span>
+        </div>
+        
+        <!-- Circular Dial Container -->
+        <div class="flex items-center justify-center py-2">
+            <div class="relative w-36 h-36 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                    <!-- Background Track -->
+                    <circle cx="60" cy="60" r="50" stroke="#141c2e" stroke-width="9" fill="transparent" />
+                    <!-- Animated Progress Ring -->
+                    <circle id="cpuRing" class="gauge-circle" cx="60" cy="60" r="50"
+                        stroke="#00f2fe" stroke-width="9" fill="transparent"
+                        stroke-dasharray="314.159" stroke-dashoffset="{{ metrics.cpu.overall_percent|default:0 }}" />
+                </svg>
+                <div class="absolute text-center">
+                    <span class="text-2xl font-black text-white font-mono tracking-tight block" id="cpuPercentText">{{ metrics.cpu.overall_percent }}%</span>
+                    <span class="text-[10px] text-slate-400 font-mono" id="cpuFreqText">{{ metrics.cpu.freq_current_mhz }} MHz</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80 font-mono">
+            <span>Peak: {{ metrics.cpu.freq_max_mhz }} MHz</span>
+            <span class="text-cyan-400 font-bold" id="cpuStatusLabel">Nominal Load</span>
+        </div>
+    </div>
+
+    <!-- RAM Master Gauge Card -->
+    <div class="glass-card rounded-3xl p-5 border border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                <i class="fa-solid fa-memory text-emerald-400"></i>
+                <span>Physical Memory</span>
+            </span>
+            <button onclick="triggerRamOptimization()" class="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 cursor-pointer">
+                <i class="fa-solid fa-bolt text-xs"></i>
+                <span>Trim</span>
+            </button>
+        </div>
+
+        <!-- Circular Dial Container -->
+        <div class="flex items-center justify-center py-2">
+            <div class="relative w-36 h-36 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" stroke="#141c2e" stroke-width="9" fill="transparent" />
+                    <circle id="ramRing" class="gauge-circle" cx="60" cy="60" r="50"
+                        stroke="#05e6b2" stroke-width="9" fill="transparent"
+                        stroke-dasharray="314.159" stroke-dashoffset="{{ metrics.memory.percent }}" />
+                </svg>
+                <div class="absolute text-center">
+                    <span class="text-2xl font-black text-white font-mono tracking-tight block" id="ramPercentText">{{ metrics.memory.percent }}%</span>
+                    <span class="text-[10px] text-slate-400 font-mono" id="ramUsedText">{{ metrics.memory.used_gb }} / {{ metrics.memory.total_gb }} GB</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80 font-mono">
+            <span>Free: <strong class="text-emerald-400" id="ramAvailText">{{ metrics.memory.available_gb }} GB</strong></span>
+            <span>Swap: <span id="swapPctText">{{ metrics.memory.swap_percent }}%</span></span>
+        </div>
+    </div>
+
+    <!-- Disk Master Gauge Card -->
+    <div class="glass-card rounded-3xl p-5 border border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                <i class="fa-solid fa-hard-drive text-amber-400"></i>
+                <span>Primary Disk (C:)</span>
+            </span>
+            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800" id="diskIoRatesText">
+                R: {{ metrics.disks.io.read_mb_s }} MB/s
+            </span>
+        </div>
+
+        <!-- Circular Dial Container -->
+        <div class="flex items-center justify-center py-2">
+            <div class="relative w-36 h-36 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" stroke="#141c2e" stroke-width="9" fill="transparent" />
+                    <circle id="diskRing" class="gauge-circle" cx="60" cy="60" r="50"
+                        stroke="#f59e0b" stroke-width="9" fill="transparent"
+                        stroke-dasharray="314.159" stroke-dashoffset="{{ metrics.disks.primary_percent }}" />
+                </svg>
+                <div class="absolute text-center">
+                    <span class="text-2xl font-black text-white font-mono tracking-tight block" id="diskPercentText">{{ metrics.disks.primary_percent }}%</span>
+                    <span class="text-[10px] text-slate-400 font-mono" id="diskUsedText">{{ metrics.disks.primary_used_gb }} / {{ metrics.disks.primary_total_gb }} GB</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80 font-mono">
+            <span>Write: <span id="diskWriteSpeedText">{{ metrics.disks.io.write_mb_s }} MB/s</span></span>
+            <span>Total Drives: {{ metrics.disks.partitions|length }}</span>
+        </div>
+    </div>
+
+    <!-- Network Master Gauge Card -->
+    <div class="glass-card rounded-3xl p-5 border border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                <i class="fa-solid fa-network-wired text-purple-400"></i>
+                <span>Network Throughput</span>
+            </span>
+            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-800/60">
+                ACTIVE
+            </span>
+        </div>
+
+        <div class="py-4 space-y-3.5">
+            <div class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-down text-xs"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] uppercase font-bold text-slate-400 block">Download</span>
+                        <span class="text-base font-black text-white font-mono" id="netDownSpeedText">{{ metrics.network.download_speed_kbps }} <span class="text-xs font-normal text-slate-400">KB/s</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-cyan-950/90 border border-cyan-500/40 text-cyan-400 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-up text-xs"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] uppercase font-bold text-slate-400 block">Upload</span>
+                        <span class="text-base font-black text-white font-mono" id="netUpSpeedText">{{ metrics.network.upload_speed_kbps }} <span class="text-xs font-normal text-slate-400">KB/s</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80 font-mono">
+            <span>Recv: <span id="netTotalRecvText">{{ metrics.network.recv_mb }} MB</span></span>
+            <span>Sent: <span id="netTotalSentText">{{ metrics.network.sent_mb }} MB</span></span>
+        </div>
+    </div>
+</div>
+
+<!-- MASTER LIVE STREAMING CHARTS -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Chart 1: Real-time CPU & RAM Utilization -->
+    <div class="glass-card rounded-3xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-3.5 h-3.5 rounded-full bg-cyan-400 pulse-beacon"></div>
+                <h3 class="text-sm font-extrabold text-white tracking-wide">CPU &amp; Memory Real-Time Trajectory (%)</h3>
+            </div>
+            <div class="flex items-center space-x-4 text-xs font-mono">
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span><span class="text-slate-300 font-bold">CPU %</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span><span class="text-slate-300 font-bold">RAM %</span></span>
+            </div>
+        </div>
+        <div class="h-68">
+            <canvas id="cpuRamChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 2: Network Real-time Speed -->
+    <div class="glass-card rounded-3xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-3.5 h-3.5 rounded-full bg-purple-400 pulse-beacon"></div>
+                <h3 class="text-sm font-extrabold text-white tracking-wide">Network Throughput Rates (KB/s)</h3>
+            </div>
+            <div class="flex items-center space-x-4 text-xs font-mono">
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span><span class="text-slate-300 font-bold">Download</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span><span class="text-slate-300 font-bold">Upload</span></span>
+            </div>
+        </div>
+        <div class="h-68">
+            <canvas id="networkChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- CPU MULTI-CORE BREAKDOWN & STORAGE PARTITIONS -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- CPU Multi-Core Heatmap -->
+    <div class="glass-card rounded-3xl p-6 border border-slate-800 lg:col-span-2">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2.5">
+                <i class="fa-solid fa-cubes-stacked text-cyan-400"></i>
+                <h3 class="text-sm font-extrabold text-white">Per-Core CPU Workload Distribution</h3>
+            </div>
+            <span class="text-xs font-mono text-cyan-400 font-bold px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800/60">{{ metrics.cpu.per_core|length }} Active Threads</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3" id="coresGrid">
+            {% for core_pct in metrics.cpu.per_core %}
+                <div class="bg-slate-950/90 rounded-2xl p-3 border border-slate-800 text-center hover:border-cyan-500/40 transition">
+                    <span class="text-[10px] font-mono font-bold text-slate-500 block mb-1">CORE {{ forloop.counter0 }}</span>
+                    <span class="text-sm font-mono font-black text-cyan-300 block mb-2 core-val">{{ core_pct }}%</span>
+                    <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                        <div class="h-1.5 rounded-full {% if core_pct > 80 %}bg-rose-500{% elif core_pct > 50 %}bg-amber-500{% else %}bg-cyan-400{% endif %} transition-all duration-300 core-bar" style="width: {{ core_pct }}%"></div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Disk Partitions Storage -->
+    <div class="glass-card rounded-3xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2.5">
+                <i class="fa-solid fa-database text-amber-400"></i>
+                <h3 class="text-sm font-extrabold text-white">Mounted Partitions</h3>
+            </div>
+            <span class="text-xs font-mono text-slate-400">{{ metrics.disks.partitions|length }} Drives</span>
+        </div>
+        <div class="space-y-3" id="partitionsContainer">
+            {% for part in metrics.disks.partitions %}
+                <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-xs">
+                    <div class="flex items-center justify-between font-mono font-bold mb-1">
+                        <span class="text-white flex items-center space-x-1.5">
+                            <i class="fa-solid fa-hard-drive text-amber-400 text-xs"></i>
+                            <span>{{ part.mountpoint }}</span>
+                            <span class="text-[10px] text-slate-500">({{ part.fstype|default:"NTFS" }})</span>
+                        </span>
+                        <span class="{% if part.percent > 85 %}text-rose-400{% elif part.percent > 70 %}text-amber-400{% else %}text-emerald-400{% endif %} font-bold">{{ part.percent }}%</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-2 my-2 overflow-hidden">
+                        <div class="h-2 rounded-full {% if part.percent > 85 %}bg-rose-500{% elif part.percent > 70 %}bg-amber-500{% else %}bg-gradient-to-r from-amber-500 to-orange-400{% endif %}" style="width: {{ part.percent }}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                        <span>Used: <strong class="text-slate-200">{{ part.used_gb }} GB</strong></span>
+                        <span>Free: <strong class="text-emerald-400">{{ part.free_gb }} GB</strong> / {{ part.total_gb }} GB</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- PROCESS EXPLORER & SYSTEM PRESSURE REDUCER -->
+<div class="glass-card rounded-3xl p-6 border border-slate-800 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+        <div>
+            <div class="flex items-center space-x-2.5">
+                <i class="fa-solid fa-list-check text-emerald-400"></i>
+                <h3 class="text-sm font-extrabold text-white">Top Memory Consumers &amp; Process Pressure Reducer</h3>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Directly terminate high-memory rogue processes to immediately alleviate CPU &amp; RAM contention.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div class="relative">
+                <input type="text" id="processSearchInput" onkeyup="filterProcesses()" placeholder="Search process or PID..."
+                    class="pl-9 pr-4 py-2 bg-slate-950/90 border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono w-52 sm:w-64 transition">
+                <i class="fa-solid fa-magnifying-glass text-slate-500 absolute left-3 top-3 text-xs"></i>
+            </div>
+            <button onclick="triggerRamOptimization()" class="px-3.5 py-2 rounded-xl bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center space-x-1.5 hover:bg-emerald-900/60 transition cursor-pointer">
+                <i class="fa-solid fa-bolt text-amber-300"></i>
+                <span>Trim Working Sets</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Process Table -->
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs font-mono" id="processesTable">
+            <thead>
+                <tr class="border-b border-slate-800 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                    <th class="py-3 px-3.5">PID</th>
+                    <th class="py-3 px-3.5">Process Name</th>
+                    <th class="py-3 px-3.5 text-right">RAM (MB)</th>
+                    <th class="py-3 px-3.5 text-right">RAM %</th>
+                    <th class="py-3 px-3.5 text-right">CPU %</th>
+                    <th class="py-3 px-3.5">Status</th>
+                    <th class="py-3 px-3.5">User</th>
+                    <th class="py-3 px-3.5 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody id="processesBody" class="divide-y divide-slate-800/60">
+                {% for proc in metrics.top_processes %}
+                    <tr class="hover:bg-slate-900/50 transition">
+                        <td class="py-3 px-3.5 text-slate-400">{{ proc.pid }}</td>
+                        <td class="py-3 px-3.5 font-bold text-white flex items-center space-x-2">
+                            <div class="w-6 h-6 rounded-lg bg-cyan-950/80 border border-cyan-800/40 flex items-center justify-center text-cyan-400 text-[10px]">
+                                <i class="fa-solid fa-gear"></i>
+                            </div>
+                            <span>{{ proc.name }}</span>
+                        </td>
+                        <td class="py-3 px-3.5 text-right text-emerald-300 font-bold">{{ proc.memory_mb }} MB</td>
+                        <td class="py-3 px-3.5 text-right text-slate-300">{{ proc.memory_percent }}%</td>
+                        <td class="py-3 px-3.5 text-right {% if proc.cpu_percent > 10 %}text-amber-400 font-bold{% else %}text-slate-300{% endif %}">{{ proc.cpu_percent }}%</td>
+                        <td class="py-3 px-3.5">
+                            <span class="px-2 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800">{{ proc.status }}</span>
+                        </td>
+                        <td class="py-3 px-3.5 text-slate-400">{{ proc.username }}</td>
+                        <td class="py-3 px-3.5 text-right">
+                            <button onclick="killProcess({{ proc.pid }}, '{{ proc.name }}')"
+                                class="px-3 py-1 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 text-rose-300 text-[11px] font-bold transition hover:scale-105 active:scale-95 cursor-pointer">
+                                <i class="fa-solid fa-xmark mr-1"></i> End
+                            </button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- DIAGNOSTIC HEALTH RECOMMENDATIONS BOX -->
+<div class="glass-card rounded-3xl p-6 border border-slate-800">
+    <div class="flex items-center justify-between mb-3.5">
+        <div class="flex items-center space-x-2.5">
+            <i class="fa-solid fa-stethoscope text-cyan-400"></i>
+            <h3 class="text-sm font-extrabold text-white">System Diagnostics &amp; Real-Time Advisor</h3>
+        </div>
+        <a href="{% url 'reports' %}" class="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center space-x-1.5 transition">
+            <span>View Historical Diagnostics</span>
+            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+        </a>
+    </div>
+    <div id="recommendationsList" class="space-y-2.5">
+        {% for rec in metrics.health.recommendations %}
+            <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs flex items-center space-x-3 text-slate-300">
+                <i class="fa-solid fa-circle-check text-emerald-400 text-base flex-shrink-0"></i>
+                <span class="leading-relaxed">{{ rec }}</span>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Initial data passed from Django view
+    const initialLabels = {{ chart_labels_json|safe }};
+    const initialCpuData = {{ chart_cpu_json|safe }};
+    const initialRamData = {{ chart_ram_json|safe }};
+
+    // Helper for Gauge Ring DashOffset calculation (Circumference: 2 * PI * 50 ~= 314.159)
+    const CIRCUMFERENCE = 314.159;
+    function setGaugeOffset(ringId, percent) {
+        const ring = document.getElementById(ringId);
+        if (!ring) return;
+        const clamped = Math.max(0, Math.min(100, percent));
+        const offset = CIRCUMFERENCE - (clamped / 100 * CIRCUMFERENCE);
+        ring.style.strokeDashoffset = offset;
+    }
+
+    // Initialize circular gauge offsets
+    setGaugeOffset('cpuRing', {{ metrics.cpu.overall_percent|default:0 }});
+    setGaugeOffset('ramRing', {{ metrics.memory.percent }});
+    setGaugeOffset('diskRing', {{ metrics.disks.primary_percent }});
+
+    // Chart.js 1: CPU & RAM Chart with smooth gradients
+    const ctxCpuRam = document.getElementById('cpuRamChart').getContext('2d');
+    const gradCpu = ctxCpuRam.createLinearGradient(0, 0, 0, 260);
+    gradCpu.addColorStop(0, 'rgba(0, 242, 254, 0.25)');
+    gradCpu.addColorStop(1, 'rgba(0, 242, 254, 0.0)');
+
+    const gradRam = ctxCpuRam.createLinearGradient(0, 0, 0, 260);
+    gradRam.addColorStop(0, 'rgba(5, 230, 178, 0.25)');
+    gradRam.addColorStop(1, 'rgba(5, 230, 178, 0.0)');
+
+    const cpuRamChart = new Chart(ctxCpuRam, {
+        type: 'line',
+        data: {
+            labels: initialLabels.length ? initialLabels : ['--:--:--'],
+            datasets: [
+                {
+                    label: 'CPU Usage (%)',
+                    data: initialCpuData.length ? initialCpuData : [0],
+                    borderColor: '#00f2fe',
+                    backgroundColor: gradCpu,
+                    borderWidth: 2.5,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 1,
+                    pointHoverRadius: 5,
+                },
+                {
+                    label: 'RAM Usage (%)',
+                    data: initialRamData.length ? initialRamData : [0],
+                    borderColor: '#05e6b2',
+                    backgroundColor: gradRam,
+                    borderWidth: 2.5,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 1,
+                    pointHoverRadius: 5,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }
+                },
+                y: {
+                    min: 0,
+                    max: 100,
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: {
+                        color: '#64748b',
+                        font: { family: 'JetBrains Mono', size: 10 },
+                        callback: val => val + '%'
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0a0e17',
+                    borderColor: 'rgba(0, 242, 254, 0.3)',
+                    borderWidth: 1,
+                    titleFont: { family: 'JetBrains Mono' },
+                    bodyFont: { family: 'JetBrains Mono' },
+                    padding: 10,
+                }
+            }
+        }
+    });
+
+    // Chart.js 2: Network Traffic Chart with smooth gradients
+    const ctxNet = document.getElementById('networkChart').getContext('2d');
+    const gradNetDown = ctxNet.createLinearGradient(0, 0, 0, 260);
+    gradNetDown.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
+    gradNetDown.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+    const gradNetUp = ctxNet.createLinearGradient(0, 0, 0, 260);
+    gradNetUp.addColorStop(0, 'rgba(168, 85, 247, 0.25)');
+    gradNetUp.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+
+    const netChart = new Chart(ctxNet, {
+        type: 'line',
+        data: {
+            labels: initialLabels.length ? initialLabels : ['--:--:--'],
+            datasets: [
+                {
+                    label: 'Download (KB/s)',
+                    data: initialLabels.map(() => 0),
+                    borderColor: '#10b981',
+                    backgroundColor: gradNetDown,
+                    borderWidth: 2.5,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 1,
+                },
+                {
+                    label: 'Upload (KB/s)',
+                    data: initialLabels.map(() => 0),
+                    borderColor: '#a855f7',
+                    backgroundColor: gradNetUp,
+                    borderWidth: 2.5,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 1,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }
+                },
+                y: {
+                    min: 0,
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    ticks: {
+                        color: '#64748b',
+                        font: { family: 'JetBrains Mono', size: 10 },
+                        callback: val => val + ' KB/s'
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0a0e17',
+                    borderColor: 'rgba(168, 85, 247, 0.3)',
+                    borderWidth: 1,
+                    titleFont: { family: 'JetBrains Mono' },
+                    bodyFont: { family: 'JetBrains Mono' },
+                    padding: 10,
+                }
+            }
+        }
+    });
+
+    // Live Polling Manager
+    let pollInterval = 2000;
+    let pollTimer = null;
+
+    function startPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        if (pollInterval > 0) {
+            pollTimer = setInterval(fetchMetrics, pollInterval);
+        }
+    }
+
+    function changePollInterval(val) {
+        pollInterval = parseInt(val, 10);
+        startPolling();
+    }
+
+    // Fetch live metrics from Django API
+    async function fetchMetrics() {
+        const refreshIcon = document.getElementById('refreshIcon');
+        if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
+        try {
+            const res = await fetch("{% url 'api_metrics' %}");
+            if (!res.ok) {
+                if (res.status === 401 || res.status === 403) {
+                    window.location.href = "{% url 'login' %}";
+                    return;
+                }
+                throw new Error("HTTP " + res.status);
+            }
+            const data = await res.json();
+            updateDashboardUI(data);
+        } catch (err) {
+            console.error("Telemetry fetch error:", err);
+        } finally {
+            if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+        }
+    }
+
+    function updateDashboardUI(data) {
+        // System Header
+        document.getElementById('sysUptime').innerText = data.system.uptime;
+
+        // Health Score
+        const healthBadge = document.getElementById('healthBadge');
+        const healthText = document.getElementById('healthText');
+        healthText.innerText = `HEALTH: ${data.health.score}/100 (${data.health.status_level})`;
+        if (data.health.score >= 80) {
+            healthBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-emerald-500/40 bg-emerald-950/60 text-emerald-300 flex items-center space-x-1.5';
+        } else if (data.health.score >= 60) {
+            healthBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-amber-500/40 bg-amber-950/60 text-amber-300 flex items-center space-x-1.5';
+        } else {
+            healthBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-rose-500/40 bg-rose-950/60 text-rose-300 flex items-center space-x-1.5';
+        }
+
+        // Hero RAM stats
+        document.getElementById('heroRamPct').innerText = `${data.memory.percent}%`;
+        document.getElementById('heroRamAvail').innerText = `${data.memory.available_gb} GB`;
+        document.getElementById('heroProcCount').innerText = data.processes_count;
+
+        // Master Gauge 1: CPU
+        document.getElementById('cpuPercentText').innerText = `${data.cpu.overall_percent}%`;
+        document.getElementById('cpuFreqText').innerText = `${data.cpu.freq_current_mhz} MHz`;
+        setGaugeOffset('cpuRing', data.cpu.overall_percent);
+
+        // Master Gauge 2: RAM
+        document.getElementById('ramPercentText').innerText = `${data.memory.percent}%`;
+        document.getElementById('ramUsedText').innerText = `${data.memory.used_gb} / ${data.memory.total_gb} GB`;
+        document.getElementById('ramAvailText').innerText = `${data.memory.available_gb} GB`;
+        document.getElementById('swapPctText').innerText = `${data.memory.swap_percent}%`;
+        setGaugeOffset('ramRing', data.memory.percent);
+
+        // Master Gauge 3: Disk
+        document.getElementById('diskPercentText').innerText = `${data.disks.primary_percent}%`;
+        document.getElementById('diskUsedText').innerText = `${data.disks.primary_used_gb} / ${data.disks.primary_total_gb} GB`;
+        document.getElementById('diskIoRatesText').innerText = `R: ${data.disks.io.read_mb_s} MB/s`;
+        document.getElementById('diskWriteSpeedText').innerText = `${data.disks.io.write_mb_s} MB/s`;
+        setGaugeOffset('diskRing', data.disks.primary_percent);
+
+        // Network Card
+        document.getElementById('netDownSpeedText').innerHTML = `${data.network.download_speed_kbps} <span class="text-xs font-normal text-slate-400">KB/s</span>`;
+        document.getElementById('netUpSpeedText').innerHTML = `${data.network.upload_speed_kbps} <span class="text-xs font-normal text-slate-400">KB/s</span>`;
+        document.getElementById('netTotalRecvText').innerText = `${data.network.recv_mb} MB`;
+        document.getElementById('netTotalSentText').innerText = `${data.network.sent_mb} MB`;
+
+        // Update CPU Multi-Core grid
+        const coreVals = document.querySelectorAll('.core-val');
+        const coreBars = document.querySelectorAll('.core-bar');
+        if (data.cpu.per_core && coreVals.length === data.cpu.per_core.length) {
+            data.cpu.per_core.forEach((val, i) => {
+                coreVals[i].innerText = val + '%';
+                coreBars[i].style.width = val + '%';
+                coreBars[i].className = `h-1.5 rounded-full transition-all duration-300 core-bar ${val > 80 ? 'bg-rose-500' : val > 50 ? 'bg-amber-500' : 'bg-cyan-400'}`;
+            });
+        }
+
+        // Update Charts
+        const timeLabel = data.timestamp;
+        
+        // Push CPU & RAM data
+        if (cpuRamChart.data.labels.length > 30) {
+            cpuRamChart.data.labels.shift();
+            cpuRamChart.data.datasets[0].data.shift();
+            cpuRamChart.data.datasets[1].data.shift();
+        }
+        cpuRamChart.data.labels.push(timeLabel);
+        cpuRamChart.data.datasets[0].data.push(data.cpu.overall_percent);
+        cpuRamChart.data.datasets[1].data.push(data.memory.percent);
+        cpuRamChart.update('none');
+
+        // Push Network data
+        if (netChart.data.labels.length > 30) {
+            netChart.data.labels.shift();
+            netChart.data.datasets[0].data.shift();
+            netChart.data.datasets[1].data.shift();
+        }
+        netChart.data.labels.push(timeLabel);
+        netChart.data.datasets[0].data.push(data.network.download_speed_kbps);
+        netChart.data.datasets[1].data.push(data.network.upload_speed_kbps);
+        netChart.update('none');
+
+        // Update Processes Table
+        renderProcesses(data.top_processes);
+
+        // Update Diagnostic Recommendations
+        const recList = document.getElementById('recommendationsList');
+        if (recList && data.health.recommendations) {
+            recList.innerHTML = data.health.recommendations.map(r => `
+                <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs flex items-center space-x-3 text-slate-300">
+                    <i class="fa-solid fa-circle-check text-emerald-400 text-base flex-shrink-0"></i>
+                    <span class="leading-relaxed">${r}</span>
+                </div>
+            `).join('');
+        }
+    }
+
+    function renderProcesses(processes) {
+        const tbody = document.getElementById('processesBody');
+        if (!tbody || !processes) return;
+
+        const filter = (document.getElementById('processSearchInput')?.value || '').toLowerCase();
+
+        tbody.innerHTML = processes.map(proc => {
+            const match = !filter || proc.name.toLowerCase().includes(filter) || String(proc.pid).includes(filter);
+            return `
+                <tr class="hover:bg-slate-900/50 transition ${match ? '' : 'hidden'}">
+                    <td class="py-3 px-3.5 text-slate-400">${proc.pid}</td>
+                    <td class="py-3 px-3.5 font-bold text-white flex items-center space-x-2">
+                        <div class="w-6 h-6 rounded-lg bg-cyan-950/80 border border-cyan-800/40 flex items-center justify-center text-cyan-400 text-[10px]">
+                            <i class="fa-solid fa-gear"></i>
+                        </div>
+                        <span>${proc.name}</span>
+                    </td>
+                    <td class="py-3 px-3.5 text-right text-emerald-300 font-bold">${proc.memory_mb} MB</td>
+                    <td class="py-3 px-3.5 text-right text-slate-300">${proc.memory_percent}%</td>
+                    <td class="py-3 px-3.5 text-right ${proc.cpu_percent > 10 ? 'text-amber-400 font-bold' : 'text-slate-300'}">${proc.cpu_percent}%</td>
+                    <td class="py-3 px-3.5">
+                        <span class="px-2 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800">${proc.status}</span>
+                    </td>
+                    <td class="py-3 px-3.5 text-slate-400">${proc.username}</td>
+                    <td class="py-3 px-3.5 text-right">
+                        <button onclick="killProcess(${proc.pid}, '${proc.name}')"
+                            class="px-3 py-1 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 text-rose-300 text-[11px] font-bold transition hover:scale-105 active:scale-95 cursor-pointer">
+                            <i class="fa-solid fa-xmark mr-1"></i> End
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterProcesses() {
+        const filter = document.getElementById('processSearchInput').value.toLowerCase();
+        const rows = document.querySelectorAll('#processesBody tr');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        });
+    }
+
+    // Kill Process Handler
+    async function killProcess(pid, name) {
+        if (!confirm(`Are you sure you want to terminate process "${name}" (PID: ${pid}) to reduce system pressure?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch("{% url 'api_kill_process' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ pid: pid })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("Process Terminated ⚡", data.message, "success");
+                fetchMetrics();
+            } else {
+                showToast("Action Denied", data.error || "Could not terminate process.", "error");
+            }
+        } catch (err) {
+            showToast("Error", "Request failed: " + err, "error");
+        }
+    }
+
+    function copyNetworkUrl() {
+        const url = document.getElementById('networkUrl').innerText;
+        navigator.clipboard.writeText(url).then(() => {
+            showToast("URL Copied to Clipboard 📋", `Access link ${url} copied! You can open it on your phone or other PC.`, "success");
+        }).catch(() => {
+            prompt("Copy this URL:", url);
+        });
+    }
+
+    // Start live polling on page load
+    startPolling();
+</script>
+{% endblock %}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>System Health & Telemetry Audit Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        @media print {
+            .no-print { display: none !important; }
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            @page { margin: 1.5cm; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 p-8 min-h-screen">
+
+    <!-- Print Control Bar -->
+    <div class="max-w-4xl mx-auto mb-6 flex items-center justify-between no-print bg-white p-4 rounded-xl shadow border border-slate-200">
+        <div class="flex items-center space-x-2 text-sm text-slate-600">
+            <i class="fa-solid fa-circle-info text-cyan-600"></i>
+            <span>This report is optimized for printing and PDF generation.</span>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold flex items-center space-x-2 shadow">
+                <i class="fa-solid fa-print"></i>
+                <span>Print / Save as PDF</span>
+            </button>
+            <button onclick="window.close()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-semibold">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Printable Report Container -->
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-10">
+        <!-- Header -->
+        <div class="flex items-start justify-between border-b pb-6 mb-6">
+            <div>
+                <div class="flex items-center space-x-2 text-indigo-600 font-extrabold text-2xl">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span>SysMonitor Executive Audit</span>
+                </div>
+                <h1 class="text-xl font-bold text-slate-900 mt-1">System Telemetry & Health Audit Report</h1>
+                <p class="text-xs text-slate-500 mt-0.5">Generated for Administrator: <strong>{{ request.user.username }}</strong></p>
+            </div>
+            <div class="text-right text-xs text-slate-500 font-mono">
+                <div>Report Date: <strong>{{ generated_at }}</strong></div>
+                <div>Status: <span class="font-bold text-emerald-600 uppercase">{{ current.health.status_level }} ({{ current.health.score }}/100)</span></div>
+                <div>Host: <strong>{{ current.system.hostname }}</strong></div>
+            </div>
+        </div>
+
+        <!-- Executive Summary Cards -->
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">1. Executive Subsystem Metrics</h2>
+        <div class="grid grid-cols-4 gap-4 mb-6">
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                <span class="text-xs text-slate-500 block">Health Rating</span>
+                <span class="text-2xl font-black text-emerald-600 font-mono">{{ current.health.score }}/100</span>
+                <span class="text-[10px] text-slate-400 block mt-1">{{ current.health.status_level }}</span>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                <span class="text-xs text-slate-500 block">Current CPU</span>
+                <span class="text-2xl font-black text-slate-800 font-mono">{{ current.cpu.overall_percent }}%</span>
+                <span class="text-[10px] text-slate-400 block mt-1">Clock: {{ current.cpu.freq_current_mhz }} MHz</span>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                <span class="text-xs text-slate-500 block">Current RAM</span>
+                <span class="text-2xl font-black text-slate-800 font-mono">{{ current.memory.percent }}%</span>
+                <span class="text-[10px] text-slate-400 block mt-1">{{ current.memory.used_gb }} / {{ current.memory.total_gb }} GB</span>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                <span class="text-xs text-slate-500 block">Primary Disk</span>
+                <span class="text-2xl font-black text-slate-800 font-mono">{{ current.disks.primary_percent }}%</span>
+                <span class="text-[10px] text-slate-400 block mt-1">{{ current.disks.primary_used_gb }} / {{ current.disks.primary_total_gb }} GB</span>
+            </div>
+        </div>
+
+        <!-- Hardware & Platform Specification -->
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">2. System Environment & Specifications</h2>
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6 text-xs font-mono grid grid-cols-2 gap-y-2 gap-x-4">
+            <div><span class="text-slate-500">Operating System:</span> <strong>{{ current.system.os }}</strong></div>
+            <div><span class="text-slate-500">Machine Hostname:</span> <strong>{{ current.system.hostname }}</strong></div>
+            <div><span class="text-slate-500">CPU Cores / Threads:</span> <strong>{{ current.cpu.physical_cores }} Cores ({{ current.cpu.logical_cores }} Threads)</strong></div>
+            <div><span class="text-slate-500">Total Physical Memory:</span> <strong>{{ current.memory.total_gb }} GB</strong></div>
+            <div><span class="text-slate-500">System Boot Time:</span> <strong>{{ current.system.boot_time }}</strong></div>
+            <div><span class="text-slate-500">System Uptime:</span> <strong>{{ current.system.uptime }}</strong></div>
+            <div><span class="text-slate-500">Python Runtime:</span> <strong>Python {{ current.system.python_version }}</strong></div>
+            <div><span class="text-slate-500">Active Task Threads:</span> <strong>{{ current.processes_count }} Processes</strong></div>
+        </div>
+
+        <!-- Diagnostics & Automated Advice -->
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">3. Automated Diagnostics & Advice</h2>
+        <div class="space-y-2 mb-6">
+            {% for rec in current.health.recommendations %}
+                <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center space-x-2">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                    <span>{{ rec }}</span>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- RAM Optimization Summary -->
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">4. RAM Optimization & Pressure Relief Log</h2>
+        <div class="mb-6">
+            <p class="text-xs text-slate-600 mb-2">
+                Total Optimizations Executed: <strong>{{ stats.total_optimizations }}</strong> | Total Reclaimed RAM: <strong>{{ stats.total_freed_mb }} MB</strong>
+            </p>
+            <table class="w-full text-left text-xs font-mono border border-slate-200 rounded-lg overflow-hidden">
+                <thead class="bg-slate-100 text-slate-600 border-b">
+                    <tr>
+                        <th class="p-2">Timestamp</th>
+                        <th class="p-2">Initiator</th>
+                        <th class="p-2 text-right">Before</th>
+                        <th class="p-2 text-right">After</th>
+                        <th class="p-2 text-right">Freed</th>
+                        <th class="p-2 text-right">Trimmed</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for opt in recent_optimizations %}
+                        <tr>
+                            <td class="p-2">{{ opt.timestamp|date:"Y-m-d H:i:s" }}</td>
+                            <td class="p-2">{{ opt.initiated_by }}</td>
+                            <td class="p-2 text-right">{{ opt.memory_before_mb }} MB ({{ opt.percent_before }}%)</td>
+                            <td class="p-2 text-right">{{ opt.memory_after_mb }} MB ({{ opt.percent_after }}%)</td>
+                            <td class="p-2 text-right font-bold text-emerald-700">+{{ opt.memory_freed_mb }} MB</td>
+                            <td class="p-2 text-right">{{ opt.processes_trimmed }} procs</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="p-4 text-center text-slate-400">No optimization runs recorded yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Top Memory Consuming Processes -->
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">5. Current Top Memory Consumer Processes</h2>
+        <table class="w-full text-left text-xs font-mono border border-slate-200 rounded-lg overflow-hidden mb-8">
+            <thead class="bg-slate-100 text-slate-600 border-b">
+                <tr>
+                    <th class="p-2">PID</th>
+                    <th class="p-2">Process Name</th>
+                    <th class="p-2 text-right">Memory RSS</th>
+                    <th class="p-2 text-right">Memory %</th>
+                    <th class="p-2 text-right">CPU %</th>
+                    <th class="p-2">User</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+                {% for proc in current.top_processes|slice:":10" %}
+                    <tr>
+                        <td class="p-2">{{ proc.pid }}</td>
+                        <td class="p-2 font-bold">{{ proc.name }}</td>
+                        <td class="p-2 text-right font-bold">{{ proc.memory_mb }} MB</td>
+                        <td class="p-2 text-right">{{ proc.memory_percent }}%</td>
+                        <td class="p-2 text-right">{{ proc.cpu_percent }}%</td>
+                        <td class="p-2">{{ proc.username }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Sign-off Footer -->
+        <div class="border-t pt-6 flex items-center justify-between text-xs text-slate-500">
+            <div>
+                <span>Audited By: <strong>Avinash</strong> (System Administrator)</span>
+            </div>
+            <div>
+                <span>Generated by SysMonitor PRO &bull; Python Django Telemetry Engine</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
