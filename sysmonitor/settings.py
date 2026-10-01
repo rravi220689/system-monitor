@@ -27,6 +27,34 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://*.ddns.net',
+    'https://*.ddns.net',
+    'http://*.duckdns.org',
+    'https://*.duckdns.org',
+    'http://*.localhost',
+    'http://localhost',
+    'https://localhost',
+    'http://127.0.0.1',
+    'https://127.0.0.1',
+    'http://localhost:4007',
+    'https://localhost:4007',
+    'http://127.0.0.1:4007',
+    'https://127.0.0.1:4007',
+    'http://rravi.ddns.net:4007',
+    'https://rravi.ddns.net:4007',
+    'http://rravi.ddns.net',
+    'https://rravi.ddns.net',
+    'http://160.191.14.183:4007',
+    'https://160.191.14.183:4007',
+    'http://160.191.14.183:8000',
+    'https://160.191.14.183:8000',
+]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
 
 # Application definition
 
